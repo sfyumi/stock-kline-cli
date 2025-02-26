@@ -117,17 +117,7 @@ async function getKLineData(code, type = 'day') {
     // console.log('K线类型:', klineType);
 
     // 不同市场和类型的数据结构不同
-    let klines;
-    if (code.startsWith('sh000') || code.startsWith('sz399')) {
-      // 指数数据在 day/week 字段中
-      klines = stockData[klineType];
-    } else if (marketInfo.type === 'A') {
-      // A股数据在 qfqday/qfqweek 字段中
-      klines = stockData[`qfq${klineType}`];
-    } else {
-      // 港股数据在 day/week 字段中
-      klines = stockData[klineType];
-    }
+    let klines = stockData[klineType] || stockData[`qfq${klineType}`];
 
     if (!klines) {
       console.error(`未能获取到${code}的${type}K线数据`);
