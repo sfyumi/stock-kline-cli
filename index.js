@@ -71,7 +71,7 @@ async function getKLineData(code, type = 'day') {
     }
 
     if (marketInfo.type === 'US') {
-      console.log(`美股暂不支持K线图: ${code}`);
+      console.log(chalk.red(`\n美股暂不支持K线图: ${code}`));
       return []
     }
 
