@@ -84,6 +84,92 @@ async function getKLineData(code, type = 'day') {
   }
 }
 
+// 分析K线形态
+function analyzeKLinePattern(klineData) {
+  if (klineData.length < 3) return [];
+
+  const patterns = [];
+  
+  // 分析最近三天的K线
+  const recent = klineData.slice(-3);
+  
+  // 判断锤子线
+  const last = recent[2];
+  const bodyLength = Math.abs(last.close - last.open);
+  const shadowLength = last.high - last.low;
+  const lowerShadow = Math.min(last.open, last.close) - last.low;
+  
+  if (lowerShadow > bodyLength * 2 && shadowLength > bodyLength * 3) {
+    patterns.push({
+      type: '锤子线',
+      position: last.date,
+      meaning: '可能预示着下跌趋势即将结束，市场可能反转向上'
+    });
+  }
+
+  // 判断启明星形态
+  if (recent.length === 3) {
+    const [day1, day2, day3] = recent;
+    const day1Body = day1.close - day1.open;
+    const day2Body = Math.abs(day2.close - day2.open);
+    const day3Body = day3.close - day3.open;
+    
+    if (day1Body < 0 && // 第一天下跌
+        day2Body < Math.abs(day1Body) * 0.3 && // 第二天十字星
+        day3Body > 0 && // 第三天上涨
+        day2.high < day1.close && // 缺口
+        day3.open > day2.high) {
+      patterns.push({
+        type: '启明星',
+        position: day3.date,
+        meaning: '强势反转信号，预示着可能开始上涨趋势'
+      });
+    }
+  }
+
+  return patterns;
+}
+
+// 分析趋势
+function analyzeTrend(klineData) {
+  if (klineData.length < 5) return null;
+
+  const prices = klineData.map(k => k.close);
+  const ma5 = prices.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const ma10 = klineData.length >= 10 ? 
+    prices.slice(-10).reduce((a, b) => a + b, 0) / 10 : null;
+  
+  const lastPrice = prices[prices.length - 1];
+  const startPrice = prices[0];
+  const priceChange = ((lastPrice - startPrice) / startPrice * 100).toFixed(2);
+  
+  let trend = '';
+  let strength = '';
+  
+  // 判断趋势
+  if (lastPrice > ma5 && (ma10 === null || ma5 > ma10)) {
+    trend = '上涨';
+    strength = priceChange > 5 ? '强势' : '弱势';
+  } else if (lastPrice < ma5 && (ma10 === null || ma5 < ma10)) {
+    trend = '下跌';
+    strength = priceChange < -5 ? '强势' : '弱势';
+  } else {
+    trend = '盘整';
+    strength = '震荡';
+  }
+
+  return {
+    trend,
+    strength,
+    priceChange: `${priceChange}%`,
+    analysis: `${strength}${trend}趋势，区间涨跌幅${priceChange}%，${
+      trend === '盘整' ? '建议观望' :
+      trend === '上涨' ? (strength === '强势' ? '注意防守' : '可以跟进') :
+      strength === '强势' ? '注意止损' : '等待企稳'
+    }`
+  };
+}
+
 function printKLineChart(klineData, type, stockName, code) {
   if (klineData.length === 0) return;
 
@@ -122,6 +208,27 @@ function printKLineChart(klineData, type, stockName, code) {
   console.log(chalk.red(`最低: ${minPrice.toFixed(2)}`));
   console.log(chalk.yellow(`平均: ${avgPrice.toFixed(2)}`));
   console.log(chalk.cyan(`区间涨跌: ${priceChange}%`));
+
+  // 添加AI分析
+  console.log(chalk.magenta('\nAI分析:'));
+  
+  // 分析K线形态
+  const patterns = analyzeKLinePattern(klineData);
+  if (patterns.length > 0) {
+    console.log(chalk.yellow('发现K线形态:'));
+    patterns.forEach(p => {
+      console.log(`- ${p.type} (${p.position})`);
+      console.log(`  ${p.meaning}`);
+    });
+  }
+
+  // 分析趋势
+  const trend = analyzeTrend(klineData);
+  if (trend) {
+    console.log(chalk.yellow('\n趋势分析:'));
+    console.log(`- 当前趋势: ${trend.trend} (${trend.strength})`);
+    console.log(`- 分析建议: ${trend.analysis}`);
+  }
 }
 
 async function printStock(list) {
