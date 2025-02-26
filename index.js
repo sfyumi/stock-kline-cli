@@ -15,11 +15,22 @@ const config = {
   defaultPeriod: 20 // 默认周期数
 }
 
+// 股票市场配置
+const MARKET_CONFIG = {
+  // A股
+  sh: { type: 'A', name: '上证', api: 'qt.gtimg.cn', needConvert: true, currency: '￥' },
+  sz: { type: 'A', name: '深证', api: 'qt.gtimg.cn', needConvert: true, currency: '￥' },
+  // 港股
+  hk: { type: 'HK', name: '港股', api: 'qt.gtimg.cn', needConvert: true, currency: 'HK$' },
+  // 美股
+  us: { type: 'US', name: '美股', api: 'qt.gtimg.cn', needConvert: true, currency: '$' }
+};
+
 program
-  .version('1.0.2', '-v, --version')
+  .version('1.0.3', '-v, --version')
   .option('-c, --config <path>', '设置配置文件')
   .option('-d', '隐藏表头')
-  .option('-s, --stock <list>', '设置stock代码, 多个以逗号隔开', (val) => val.split(','))
+  .option('-s, --stock <list>', '设置stock代码, 多个以逗号隔开\n  A股示例: sh600000,sz000001\n  港股示例: hk00700\n  美股示例: usAAPL', (val) => val.split(','))
   .option('--day', '显示日K数据')
   .option('--week', '显示周K数据')
   .option('-p, --period <number>', '设置显示的周期数量，默认20', (val) => parseInt(val))
@@ -40,46 +51,73 @@ if (options.stock) {
   printStock(configData.stocks);
 }
 
+// 获取股票市场信息
+function getMarketInfo(code) {
+  const market = code.substring(0, 2).toLowerCase();
+  return MARKET_CONFIG[market] || null;
+}
+
 async function getKLineData(code, type = 'day') {
   try {
+    const marketInfo = getMarketInfo(code);
+    if (!marketInfo) {
+      throw new Error(`不支持的股票代码格式: ${code}`);
+    }
+
     const klineType = type === 'day' ? 'day' : 'week';
     const period = options.period || config.defaultPeriod;
     
+    // 美股和港股使用不同的API参数
+    const apiUrl = marketInfo.type === 'US' || marketInfo.type === 'HK' ?
+      `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_day${klineType}&param=${code},${klineType},,,${period * 2},qfq` :
+      `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${code},${klineType},,,${period * 2},qfq`;
+
     const response = await axios({
       method: 'get',
-      url: `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${code},${klineType},,,${period * 2},qfq`,
+      url: apiUrl,
       headers: {
         'Referer': 'http://web.ifzq.gtimg.cn/',
         'User-Agent': 'Mozilla/5.0'
       }
     });
-    
-    if (response.data && response.data.data && response.data.data[code]) {
-      const stockData = response.data.data[code];
-      // 根据类型获取对应的数据
-      let klineData;
-      if (type === 'day') {
-        klineData = stockData.qfqday || stockData.day;
-      } else {
-        klineData = stockData.qfqweek || stockData.week;
-      }
 
-      if (klineData && klineData.length > 0) {
-        // 返回指定周期数量的数据
-        return klineData.slice(-period).map(item => ({
-          date: item[0],
-          open: parseFloat(item[1]),
-          close: parseFloat(item[2]),
-          high: parseFloat(item[3]),
-          low: parseFloat(item[4]),
-          volume: parseInt(item[5]),
-          price: parseFloat(item[2]) // 收盘价作为当前价格
-        }));
+    let data = response.data;
+    
+    // 处理美股和港股的数据格式
+    if (marketInfo.type === 'US' || marketInfo.type === 'HK') {
+      if (typeof data === 'string') {
+        data = JSON.parse(data.replace(/^[^{]*/, ''));
       }
     }
-    return [];
+
+    const klineData = [];
+    let stockData = data.data[code];
+
+    if (!stockData) {
+      console.error(`未能获取到${code}的K线数据`);
+      return [];
+    }
+
+    const klines = stockData[`${klineType}qfq`] || stockData[klineType];
+    if (!klines) {
+      console.error(`未能获取到${code}的${type}K线数据`);
+      return [];
+    }
+
+    klines.forEach(k => {
+      klineData.push({
+        date: k[0],
+        open: parseFloat(k[1]),
+        close: parseFloat(k[2]),
+        high: parseFloat(k[3]),
+        low: parseFloat(k[4]),
+        volume: parseFloat(k[5])
+      });
+    });
+
+    return klineData;
   } catch (error) {
-    console.error(`获取${type}K数据失败:`, error.message);
+    console.error(`获取K线数据失败: ${error.message}`);
     return [];
   }
 }
@@ -235,44 +273,77 @@ async function printStock(list) {
   try {
     const options = program.opts();
     
-    // 获取实时数据
-    const response = await axios({
-      method: 'get',
-      url: `https://qt.gtimg.cn/q=${list.join(',')}`,
-      responseType: "arraybuffer"
-    });
+    // 按市场分组股票代码
+    const stocksByMarket = list.reduce((acc, code) => {
+      const marketInfo = getMarketInfo(code);
+      if (!marketInfo) {
+        console.error(`不支持的股票代码格式: ${code}`);
+        return acc;
+      }
+      if (!acc[marketInfo.type]) {
+        acc[marketInfo.type] = [];
+      }
+      acc[marketInfo.type].push(code);
+      return acc;
+    }, {});
 
-    let data = iconv.decode(response.data, 'gbk');
-    let arr = data.split('\n');
     let tableData = [];
     if (config.showHead) {
-      tableData.push(columns);
+      tableData.push(['名字', '代码', '当前股价', '今日涨跌幅', '昨日收盘价']);
     }
 
-    for (let i = 0; i < arr.length - 1; i++) {
-      let item = arr[i];
-      let match = item.match(/v_(.+)="(.+)"/);
-      if (match) {
-        let values = match[2].split('~');
-        let stockCode = match[1];
-        let stockName = values[1];
-        
-        tableData.push([
-          stockName,
-          stockCode,
-          values[3],
-          values[32] + '%',
-          values[4]
-        ]);
+    // 处理每个市场的股票
+    for (const [marketType, stocks] of Object.entries(stocksByMarket)) {
+      const response = await axios({
+        method: 'get',
+        url: `https://qt.gtimg.cn/q=${stocks.join(',')}`,
+        responseType: "arraybuffer"
+      });
 
-        // 如果开启了日K或周K选项，获取并打印K线图表
-        if (options.day) {
-          const dayKData = await getKLineData(stockCode, 'day');
-          printKLineChart(dayKData, '日', stockName, stockCode);
-        }
-        if (options.week) {
-          const weekKData = await getKLineData(stockCode, 'week');
-          printKLineChart(weekKData, '周', stockName, stockCode);
+      let data;
+      if (marketType === 'US') {
+        data = iconv.decode(response.data, 'gbk');
+      } else {
+        data = iconv.decode(response.data, 'gbk');
+      }
+
+      let arr = data.split('\n');
+
+      for (let i = 0; i < arr.length - 1; i++) {
+        let item = arr[i];
+        let match = item.match(/v_(.+)="(.+)"/);
+        if (match) {
+          let values = match[2].split('~');
+          let stockCode = match[1];
+          let stockName = values[1];
+          let marketInfo = getMarketInfo(stockCode);
+          
+          // 根据不同市场调整数据位置
+          const priceIndex = marketType === 'US' ? 3 : 3;
+          const changeIndex = marketType === 'US' ? 32 : 32;
+          const prevCloseIndex = marketType === 'US' ? 4 : 4;
+          
+          // 添加币种符号
+          const price = `${marketInfo.currency}${values[priceIndex]}`;
+          const prevClose = `${marketInfo.currency}${values[prevCloseIndex]}`;
+          
+          tableData.push([
+            `${stockName}(${marketInfo.name})`,
+            stockCode,
+            price,
+            values[changeIndex] + '%',
+            prevClose
+          ]);
+
+          // 如果开启了日K或周K选项，获取并打印K线图表
+          if (options.day) {
+            const dayKData = await getKLineData(stockCode, 'day');
+            printKLineChart(dayKData, '日', stockName, stockCode);
+          }
+          if (options.week) {
+            const weekKData = await getKLineData(stockCode, 'week');
+            printKLineChart(weekKData, '周', stockName, stockCode);
+          }
         }
       }
     }
