@@ -12,7 +12,8 @@ const columns = ['名字', '代码', '当前股价', '今日涨跌幅', '昨日�
 
 const config = {
   showHead: true,
-  defaultPeriod: 20 // 默认周期数
+  defaultPeriod: 20, // 默认周期数
+  enableAIAnalysis: false // 默认不开启AI分析
 }
 
 // 股票市场配置
@@ -35,12 +36,16 @@ program
   .option('--week', '显示周K数据')
   .option('-p, --period <number>', '设置显示的周期数量，默认20', (val) => parseInt(val))
   .option('-h, --height <number>', '设置图表高度，默认15', (val) => parseInt(val))
+  .option('--ai', '开启AI分析')
 
 program.parse();
 
 const options = program.opts();
 if (options.d) {
   config.showHead = false;
+}
+if (options.ai) {
+  config.enableAIAnalysis = true;
 }
 
 if (options.stock) {
@@ -252,25 +257,28 @@ function printKLineChart(klineData, type, stockName, code) {
   console.log(chalk.yellow(`平均: ${avgPrice.toFixed(2)}`));
   console.log(chalk.cyan(`区间涨跌: ${priceChange}%`));
 
-  // 添加AI分析
-  console.log(chalk.magenta('\nAI分析:'));
-  
-  // 分析K线形态
-  const patterns = analyzeKLinePattern(klineData);
-  if (patterns.length > 0) {
-    console.log(chalk.yellow('发现K线形态:'));
-    patterns.forEach(p => {
-      console.log(`- ${p.type} (${p.position})`);
-      console.log(`  ${p.meaning}`);
-    });
-  }
+  // 只在启用AI分析时显示分析结果
+  if (config.enableAIAnalysis) {
+    // 添加AI分析
+    console.log(chalk.magenta('\nAI分析:'));
+    
+    // 分析K线形态
+    const patterns = analyzeKLinePattern(klineData);
+    if (patterns.length > 0) {
+      console.log(chalk.yellow('发现K线形态:'));
+      patterns.forEach(p => {
+        console.log(`- ${p.type} (${p.position})`);
+        console.log(`  ${p.meaning}`);
+      });
+    }
 
-  // 分析趋势
-  const trend = analyzeTrend(klineData);
-  if (trend) {
-    console.log(chalk.yellow('\n趋势分析:'));
-    console.log(`- 当前趋势: ${trend.trend} (${trend.strength})`);
-    console.log(`- 分析建议: ${trend.analysis}`);
+    // 分析趋势
+    const trend = analyzeTrend(klineData);
+    if (trend) {
+      console.log(chalk.yellow('\n趋势分析:'));
+      console.log(`- 当前趋势: ${trend.trend} (${trend.strength})`);
+      console.log(`- 分析建议: ${trend.analysis}`);
+    }
   }
 }
 
