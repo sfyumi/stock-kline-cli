@@ -64,6 +64,11 @@ async function getKLineData(code, type = 'day') {
       throw new Error(`不支持的股票代码格式: ${code}`);
     }
 
+    if (marketInfo.type === 'US') {
+      console.log(`美股暂不支持K线图: ${code}`);
+      return []
+    }
+
     const klineType = type === 'day' ? 'day' : 'week';
     const period = options.period || config.defaultPeriod;
     
