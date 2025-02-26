@@ -1,6 +1,6 @@
 {
   "name": "stock-kline-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "在终端上打印股票实时数据和K线图的命令行工具",
   "main": "index.js",
   "bin": {
@@ -21,6 +21,14 @@
   ],
   "author": "user_9527",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OnePieceJoker/stock-kline-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OnePieceJoker/stock-kline-cli/issues"
+  },
+  "homepage": "https://github.com/OnePieceJoker/stock-kline-cli#readme",
   "dependencies": {
     "axios": "^0.21.4",
     "commander": "^6.2.1",
