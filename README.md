@@ -55,13 +55,19 @@ stock-kline -s sh600000 --day --week
 stock-kline -s sh600000 --day -p 60
 
 # 设置图表高度（默认15）
-stock-kline -s sh600000 --day -h 20
+stock-kline -s sh600000 --day --height 20
+
+# 开启AI分析功能
+stock-kline -s sh600000 --day --ai
 
 # 隐藏表头
 stock-kline -s sh600000 -d
 
 # 使用配置文件
 stock-kline -c config.json
+
+# 显示帮助信息
+stock-kline --help
 ```
 
 ### 配置文件示例 (config.json)

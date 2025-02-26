@@ -28,15 +28,16 @@ const MARKET_CONFIG = {
 };
 
 program
-  .version('1.0.3', '-v, --version')
+  .version('1.0.4', '-v, --version')
   .option('-c, --config <path>', '设置配置文件')
   .option('-d', '隐藏表头')
   .option('-s, --stock <list>', '设置stock代码, 多个以逗号隔开\n  A股示例: sh600000,sz000001\n  港股示例: hk00700\n  美股示例: usAAPL', (val) => val.split(','))
   .option('--day', '显示日K数据')
   .option('--week', '显示周K数据')
   .option('-p, --period <number>', '设置显示的周期数量，默认20', (val) => parseInt(val))
-  .option('-h, --height <number>', '设置图表高度，默认15', (val) => parseInt(val))
+  .option('--height <number>', '设置图表高度，默认15', (val) => parseInt(val))
   .option('--ai', '开启AI分析')
+  .helpOption('--help', '显示帮助信息')
 
 program.parse();
 
