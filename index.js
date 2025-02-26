@@ -78,11 +78,15 @@ async function getKLineData(code, type = 'day') {
     const klineType = type === 'day' ? 'day' : 'week';
     const period = options.period || config.defaultPeriod;
     
-    // 美股和港股使用不同的API参数
-    const apiUrl = marketInfo.type === 'US' || marketInfo.type === 'HK' ?
-      `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_day${klineType}&param=${code},${klineType},,,${period * 2},qfq` :
-      `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${code},${klineType},,,${period * 2},qfq`;
+    // 根据不同市场使用不同的API参数
+    let apiUrl;
+    if (marketInfo.type === 'HK') {
+      apiUrl = `https://web.ifzq.gtimg.cn/appstock/app/kline/kline?_var=kline_${klineType}${code}&param=${code},${klineType},,,${period}`;
+    } else if (marketInfo.type === 'A') {
+      apiUrl = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${code},${klineType},,,${period},qfq`;
+    }
 
+    // console.log('正在获取K线数据:', apiUrl);
     const response = await axios({
       method: 'get',
       url: apiUrl,
@@ -94,10 +98,10 @@ async function getKLineData(code, type = 'day') {
 
     let data = response.data;
     
-    // 处理美股和港股的数据格式
-    if (marketInfo.type === 'US' || marketInfo.type === 'HK') {
+    // 处理港股的数据格式
+    if (marketInfo.type === 'HK') {
       if (typeof data === 'string') {
-        data = JSON.parse(data.replace(/^[^{]*/, ''));
+        data = JSON.parse(data.replace(/^[^{]*=/, ''));
       }
     }
 
@@ -109,11 +113,31 @@ async function getKLineData(code, type = 'day') {
       return [];
     }
 
-    const klines = stockData[`${klineType}qfq`] || stockData[klineType];
+    // console.log('数据结构:', Object.keys(stockData));
+    // console.log('K线类型:', klineType);
+
+    // 不同市场和类型的数据结构不同
+    let klines;
+    if (code.startsWith('sh000') || code.startsWith('sz399')) {
+      // 指数数据在 day/week 字段中
+      klines = stockData[klineType];
+    } else if (marketInfo.type === 'A') {
+      // A股数据在 qfqday/qfqweek 字段中
+      klines = stockData[`qfq${klineType}`];
+    } else {
+      // 港股数据在 day/week 字段中
+      klines = stockData[klineType];
+    }
+
     if (!klines) {
       console.error(`未能获取到${code}的${type}K线数据`);
       return [];
     }
+
+    // console.log('K线数据长度:', klines.length);
+    // if (klines.length > 0) {
+    //   console.log('第一条数据:', klines[0]);
+    // }
 
     klines.forEach(k => {
       klineData.push({
@@ -129,6 +153,10 @@ async function getKLineData(code, type = 'day') {
     return klineData;
   } catch (error) {
     console.error(`获取K线数据失败: ${error.message}`);
+    if (error.response) {
+      console.error('响应状态:', error.response.status);
+      console.error('响应数据:', error.response.data);
+    }
     return [];
   }
 }

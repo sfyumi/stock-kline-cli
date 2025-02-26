@@ -16,7 +16,7 @@
   - 趋势分析和交易建议
   - 自动生成分析报告
 
-## 最新更新 (v1.0.4)
+## 最新更新 (v1.0.5)
 
 - 支持港股、美股（注：美股不支持K线图展示）
 - AI智能分析支持命令行配置，默认不开启
@@ -55,19 +55,13 @@ stock-kline -s sh600000 --day --week
 stock-kline -s sh600000 --day -p 60
 
 # 设置图表高度（默认15）
-stock-kline -s sh600000 --day --height 20
-
-# 开启AI分析功能
-stock-kline -s sh600000 --day --ai
+stock-kline -s sh600000 --day -h 20
 
 # 隐藏表头
 stock-kline -s sh600000 -d
 
 # 使用配置文件
 stock-kline -c config.json
-
-# 显示帮助信息
-stock-kline --help
 ```
 
 ### 配置文件示例 (config.json)

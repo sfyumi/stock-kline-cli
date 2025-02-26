@@ -1,6 +1,6 @@
 {
   "name": "stock-kline-cli",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "在终端上打印股票实时数据和K线图的命令行工具",
   "main": "index.js",
   "bin": {
