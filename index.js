@@ -335,7 +335,6 @@ async function printStock(list, holdings = null) {
       tableData.push(columns);
     }
 
-    let totalAsset = 0;
     const assetDetails = [];
 
     // 处理每个市场的股票
@@ -388,7 +387,6 @@ async function printStock(list, holdings = null) {
           if (holdings && holdings[stockCode]) {
             const shares = holdings[stockCode];
             const marketValue = currentPrice * shares;
-            totalAsset += marketValue;
             
             assetDetails.push({
               name: stockName,
@@ -424,13 +422,27 @@ async function printStock(list, holdings = null) {
     // 如果开启了资产统计且有持仓信息，显示资产汇总
     if (options.asset && holdings) {
       console.log(chalk.green('\n=== 我的资产 ==='));
+      
+      // 按币种分组资产
+      const assetsByCurrency = {};
+      
       assetDetails.forEach(detail => {
         console.log(chalk.cyan(`${detail.name}(${detail.code}):`));
         console.log(`  持仓: ${detail.shares} 股`);
         console.log(`  当前价格: ${detail.currency}${detail.price.toFixed(2)}`);
         console.log(`  市值: ${detail.currency}${detail.value.toFixed(2)}`);
+        
+        // 按币种累计
+        if (!assetsByCurrency[detail.currency]) {
+          assetsByCurrency[detail.currency] = 0;
+        }
+        assetsByCurrency[detail.currency] += detail.value;
       });
-      console.log(chalk.yellow(`\n总资产: ￥${totalAsset.toFixed(2)}`));
+      
+      console.log(chalk.yellow('\n总资产:'));
+      Object.keys(assetsByCurrency).forEach(currency => {
+        console.log(`  ${currency}${assetsByCurrency[currency].toFixed(2)}`);
+      });
     }
   } catch (error) {
     console.error('获取数据失败:', error.message);
