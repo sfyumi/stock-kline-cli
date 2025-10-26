@@ -94,6 +94,8 @@ stock-kline --help
 }
 ```
 
+参考项目根目录下的 `example-holdings.json` 文件作为模板。
+
 注意：
 - `stocks`: 仅查看行情列表
 - `holdings`: 配置持仓股票及份额，格式为 `"股票代码": 持有股数`
