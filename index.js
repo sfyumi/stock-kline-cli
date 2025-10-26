@@ -37,6 +37,7 @@ program
   .option('-p, --period <number>', '设置显示的周期数量，默认20', (val) => parseInt(val))
   .option('--height <number>', '设置图表高度，默认15', (val) => parseInt(val))
   .option('--ai', '开启AI分析')
+  .option('--asset', '显示资产统计')
   .helpOption('--help', '显示帮助信息')
 
 program.parse();
@@ -54,7 +55,14 @@ if (options.stock) {
 } else if (options.config) {
   const data = fs.readFileSync(options.config);
   const configData = JSON.parse(data);
-  printStock(configData.stocks);
+  
+  // 如果配置文件包含holdings，使用它；否则使用stocks数组
+  if (configData.holdings) {
+    const stockList = Object.keys(configData.holdings);
+    printStock(stockList, configData.holdings);
+  } else {
+    printStock(configData.stocks);
+  }
 }
 
 // 获取股票市场信息
@@ -301,7 +309,7 @@ function printKLineChart(klineData, type, stockName, code) {
   }
 }
 
-async function printStock(list) {
+async function printStock(list, holdings = null) {
   try {
     const options = program.opts();
     
@@ -320,9 +328,15 @@ async function printStock(list) {
     }, {});
 
     let tableData = [];
+    const columns = holdings ? ['名字', '代码', '当前股价', '今日涨跌幅', '昨日收盘价', '持仓', '市值'] 
+                              : ['名字', '代码', '当前股价', '今日涨跌幅', '昨日收盘价'];
+    
     if (config.showHead) {
-      tableData.push(['名字', '代码', '当前股价', '今日涨跌幅', '昨日收盘价']);
+      tableData.push(columns);
     }
+
+    let totalAsset = 0;
+    const assetDetails = [];
 
     // 处理每个市场的股票
     for (const [marketType, stocks] of Object.entries(stocksByMarket)) {
@@ -355,17 +369,41 @@ async function printStock(list) {
           const changeIndex = marketType === 'US' ? 32 : 32;
           const prevCloseIndex = marketType === 'US' ? 4 : 4;
           
+          // 获取价格数值
+          const currentPrice = parseFloat(values[priceIndex]);
+          
           // 添加币种符号
-          const price = `${marketInfo.currency}${values[priceIndex]}`;
+          const priceStr = `${marketInfo.currency}${values[priceIndex]}`;
           const prevClose = `${marketInfo.currency}${values[prevCloseIndex]}`;
           
-          tableData.push([
+          const baseRow = [
             `${stockName}(${marketInfo.name})`,
             stockCode,
-            price,
+            priceStr,
             values[changeIndex] + '%',
             prevClose
-          ]);
+          ];
+
+          // 如果有持仓信息，添加持仓和市值列
+          if (holdings && holdings[stockCode]) {
+            const shares = holdings[stockCode];
+            const marketValue = currentPrice * shares;
+            totalAsset += marketValue;
+            
+            assetDetails.push({
+              name: stockName,
+              code: stockCode,
+              shares: shares,
+              price: currentPrice,
+              value: marketValue,
+              currency: marketInfo.currency
+            });
+
+            baseRow.push(shares.toString());
+            baseRow.push(`${marketInfo.currency}${marketValue.toFixed(2)}`);
+          }
+
+          tableData.push(baseRow);
 
           // 如果开启了日K或周K选项，获取并打印K线图表
           if (options.day) {
@@ -382,6 +420,18 @@ async function printStock(list) {
 
     console.log('\n实时行情:');
     console.log(table(tableData));
+
+    // 如果开启了资产统计且有持仓信息，显示资产汇总
+    if (options.asset && holdings) {
+      console.log(chalk.green('\n=== 我的资产 ==='));
+      assetDetails.forEach(detail => {
+        console.log(chalk.cyan(`${detail.name}(${detail.code}):`));
+        console.log(`  持仓: ${detail.shares} 股`);
+        console.log(`  当前价格: ${detail.currency}${detail.price.toFixed(2)}`);
+        console.log(`  市值: ${detail.currency}${detail.value.toFixed(2)}`);
+      });
+      console.log(chalk.yellow(`\n总资产: ￥${totalAsset.toFixed(2)}`));
+    }
   } catch (error) {
     console.error('获取数据失败:', error.message);
   }
