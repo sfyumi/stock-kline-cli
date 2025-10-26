@@ -28,6 +28,8 @@
 npm install -g stock-kline-cli
 ```
 
+详细安装指南请查看 [INSTALL.md](INSTALL.md)
+
 ## 使用方法
 
 ### 基本用法
